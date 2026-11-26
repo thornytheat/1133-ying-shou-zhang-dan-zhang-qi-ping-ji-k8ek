@@ -8,7 +8,7 @@
 docker compose up --build -d
 ```
 
-打开 `http://127.0.0.1:18212/` 查看账期复核单。左侧六个入口可展开运行证据。调整「账期复核名额（户）」，点击「重算账期」比较处置结果。结束后执行 `docker compose down --remove-orphans`。
+打开 `http://127.0.0.1:18212/` 查看账期复核单，点「坏账准备清单」查看本期逐户计提。左侧六个入口可展开运行证据。调整「账期复核名额（户）」，点击「重算账期」比较处置结果。结束后执行 `docker compose down --remove-orphans`。
 
 ## 独立业务模块
 
@@ -18,12 +18,14 @@ docker compose up --build -d
 - 账期建模 `term_scorecard`
 - 账期裁定 `credit_terms`
 - 回款复盘 `collection_vintage`
+- 坏账准备 `bad_debt_provision`
 
 ## 查看运行结果
 
-- `GET /api/overview` 返回默认运行及其指纹。
+- `GET /api/overview` 返回默认运行及其指纹，含本期坏账准备清单。
 - `POST /api/scenario` 接收 `{"capacity": 3}`。入口接受 1–100 的整数，应用样例时使用该业务额度。
 - `GET /api/stages/collection_vintage` 查看该环节的独立证据，支持 `?capacity=3`。
+- `GET /api/provision` 查看正式坏账准备台账的累计计提；同一批次重跑不重复增加。
 
 ```sh
 docker compose exec -T app python -m invoicecover.delivery evaluate --capacity 3

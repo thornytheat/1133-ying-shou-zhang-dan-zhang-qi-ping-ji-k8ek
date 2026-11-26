@@ -10,8 +10,10 @@ from threading import Lock
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge, UnsupportedMediaType
 
-from .pipeline import run
+from .pipeline import build
 from .batch_controls import annotate
+from .bad_debt_provision import service as provisioning
+from .bad_debt_provision.engine import ProvisionLedger
 
 MODULES = (
     ("invoice_cutoff", "账单归户"),
@@ -29,17 +31,26 @@ application.json.sort_keys = False
 application.json.sort_keys = False
 _initial_snapshot = None
 _initial_lock = Lock()
+_ledger = ProvisionLedger()
+_ledger_lock = Lock()
 
 
 def snapshot(capacity=None):
-    business_result = run(capacity)
+    business_result, provision = build(capacity)
     business_result["stages"] = annotate(business_result["stages"])
     if len(business_result["stages"]) != len(MODULES):
         raise RuntimeError("运行证据缺少业务环节")
     content = json.dumps(
         business_result, ensure_ascii=False, allow_nan=False, sort_keys=True
     )
+    with _ledger_lock:
+        _ledger.post(provision)
     return {**business_result, "run_id": sha256(content.encode()).hexdigest()[:12]}
+
+
+def ledger_document():
+    with _ledger_lock:
+        return {"title": "正式坏账准备台账", **provisioning.ledger_panel(_ledger)}
 
 
 def initial_snapshot():
@@ -69,6 +80,11 @@ def health():
 @application.get("/api/overview")
 def overview():
     return jsonify(initial_snapshot())
+
+
+@application.get("/api/provision")
+def provision_ledger():
+    return jsonify(ledger_document())
 
 
 @application.post("/api/scenario")

@@ -126,12 +126,49 @@ function renderEvidence() {
     }
 }
 
+function renderProvision() {
+    const panel = active?.provision;
+    if (!panel) return;
+    byId('evidence-heading').textContent = panel.title;
+    byId('evidence-summary').textContent = panel.summary;
+    const target = byId('stage-records');
+    target.replaceChildren();
+    const summary = named('dl', undefined, 'record-details');
+    Object.entries(panel.totals).forEach(([key, value]) => {
+        summary.append(named('dt', key.replace('（分）', '（元）')), named('dd', key.includes('（分）') ? value / 100 : value));
+    });
+    summary.append(named('dt', '批次'), named('dd', panel.batch_id));
+    target.append(summary);
+    target.append(tableFor(panel.records, Object.keys(panel.columns)));
+    const lanesHeading = named('h3', '按归口汇总');
+    const lanes = named('div');
+    renderTable(lanes, panel.lanes, {'归口': '归口', '笔数': '笔数', '敞口（分）': '敞口（分）', '计提（分）': '计提（分）'});
+    target.append(lanesHeading, lanes);
+    const checks = named('details');
+    checks.append(named('summary', `逐户对账 ${panel.reconciliation.length} 户`));
+    const checkTable = named('div');
+    renderTable(checkTable, panel.reconciliation);
+    checks.append(checkTable);
+    target.append(checks);
+    if (panel.deferred.length) {
+        const deferred = named('details');
+        deferred.append(named('summary', `暂缓或待复核 ${panel.deferred.length} 户`));
+        const deferTable = named('div');
+        renderTable(deferTable, panel.deferred);
+        deferred.append(deferTable);
+        target.append(deferred);
+    }
+    byId('evidence').scrollIntoView({block: 'nearest'});
+    byId('evidence-heading').focus({preventScroll: true});
+}
+
 function render(snapshot) {
     active = snapshot;
     selectedRow = null;
     if (typeof selection !== 'number') selection = snapshot.stages.length - 1;
     byId('run-id').textContent = snapshot.run_id;
     byId('export').disabled = false;
+    byId('provision').disabled = !snapshot.provision;
     renderMetrics(snapshot.metrics);
     renderRows();
     renderEvidence();
@@ -164,6 +201,7 @@ stageLinks.forEach((link, index) => {
     });
 });
 byId('row-filter').addEventListener('input', () => { if (active) renderRows(); });
+byId('provision').addEventListener('click', renderProvision);
 byId('scenario').addEventListener('submit', async (event) => {
     event.preventDefault();
     const button = byId('submit');

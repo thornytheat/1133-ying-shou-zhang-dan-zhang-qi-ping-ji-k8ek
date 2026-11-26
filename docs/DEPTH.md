@@ -12,6 +12,7 @@ AI/ML / 传统ML
 | M4 账期建模 | 账期建模 | 时序逻辑回归、保序校准和分布外拦截 | `src/invoicecover/term_scorecard/contracts.py` `src/invoicecover/term_scorecard/engine.py` `src/invoicecover/term_scorecard/service.py` | `tests/test_term_scorecard.py` |
 | M5 账期裁定 | 账期裁定 | 按复核优先级排序，逐席守恒 | `src/invoicecover/credit_terms/contracts.py` `src/invoicecover/credit_terms/engine.py` `src/invoicecover/credit_terms/service.py` | `tests/test_credit_terms.py` |
 | M6 回款复盘 | 回款复盘 | 校准分布 PSI 与逐账单金额复核 | `src/invoicecover/collection_vintage/contracts.py` `src/invoicecover/collection_vintage/engine.py` `src/invoicecover/collection_vintage/service.py` | `tests/test_collection_vintage.py` |
+| M7 坏账准备 | 本期坏账准备清单 | 五段互斥归口、逐户对账与批次幂等台账 | `src/invoicecover/bad_debt_provision/contracts.py` `src/invoicecover/bad_debt_provision/engine.py` `src/invoicecover/bad_debt_provision/service.py` | `tests/test_bad_debt_provision.py` `tests/test_bad_debt_batch.py` |
 
 ## 边界与证据
 
@@ -27,3 +28,8 @@ AI/ML / 传统ML
 | TRAP-44 | 相邻校准组违序 | 产生错误的业务记录或评分 | PAV 合并并计算 ECE | `src/invoicecover/term_scorecard/engine.py` | `tests/test_term_scorecard.py::test_isotonic_repairs_reversed_probability_order` |
 | TRAP-42 | 追加未来观测 | 产生错误的业务记录或评分 | 历史模型权重不变 | `src/invoicecover/term_scorecard/engine.py` | `tests/test_term_scorecard.py::test_calibration_data_never_changes_training_weights` |
 | TRAP-19 | 超期及高分同时触发 | 产生错误的业务记录或评分 | 先敞口再高分，次序确定 | `src/invoicecover/credit_terms/engine.py` | `tests/test_credit_terms.py::test_competing_rules_keep_conservative_priority_independent_of_input_order` |
+| TRAP-61 | 单户核证与组合评分同时覆盖同一笔敞口 | 准备重复计提或漏提 | 按账单分段，只归一边 | `src/invoicecover/bad_debt_provision/engine.py` | `tests/test_bad_debt_provision.py::test_specific_and_portfolio_never_double_count_the_same_cents` |
+| TRAP-62 | 账单版本未确认或回单待入账 | 把未定金额计入正式准备 | 归入未决归口，不计提 | `src/invoicecover/bad_debt_provision/engine.py` | `tests/test_bad_debt_provision.py::test_pending_bill_version_is_excluded_from_provision` `tests/test_bad_debt_provision.py::test_pending_receipt_holds_only_the_receipt_amount` |
+| TRAP-63 | 超出评分支持的户 | 无依据的估算 | 列待复核，不估算 | `src/invoicecover/bad_debt_provision/engine.py` | `tests/test_bad_debt_provision.py::test_unsupported_debtor_is_listed_but_never_estimated` |
+| TRAP-64 | 同一批次重跑 | 逐户和合计重复增加 | 批次号去重登记 | `src/invoicecover/bad_debt_provision/engine.py` | `tests/test_bad_debt_provision.py::test_repeated_batch_posting_does_not_increase_totals` |
+| TRAP-65 | 逐笔四舍五入 | 计提额超出敞口 | 逐笔取整并封顶 | `src/invoicecover/bad_debt_provision/engine.py` | `tests/test_bad_debt_provision.py::test_rounding_is_per_line_and_sum_stays_within_exposure` |

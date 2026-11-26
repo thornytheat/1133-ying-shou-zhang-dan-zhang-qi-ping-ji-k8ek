@@ -1,4 +1,15 @@
+import pytest
+
+from invoicecover import delivery
+from invoicecover.bad_debt_provision.engine import ProvisionLedger
 from invoicecover.delivery import MODULES, application
+
+
+@pytest.fixture(autouse=True)
+def fresh_process_state(monkeypatch):
+    """每个用例从空白运行快照与空台账开始。"""
+    monkeypatch.setattr(delivery, "_initial_snapshot", None)
+    monkeypatch.setattr(delivery, "_ledger", ProvisionLedger())
 
 
 def test_real_overview_returns_operational_evidence():
@@ -11,6 +22,20 @@ def test_real_overview_returns_operational_evidence():
     assert len(model["rows"]) >= 6
     assert all(model["columns"] for row in model["rows"] if row)
     assert len(model["series"]) >= 5
+    assert model["provision"]["records"]
+    assert model["provision"]["totals"]["本期计提（分）"] > 0
+
+
+def test_provision_ledger_endpoint_posts_once_per_batch():
+    client = application.test_client()
+    overview = client.get("/api/overview").get_json()
+    again = client.post("/api/scenario", json={"capacity": 6}).get_json()
+    assert again["provision"]["batch_id"] == overview["provision"]["batch_id"]
+    ledger = client.get("/api/provision").get_json()
+    assert ledger["已登记批次"] == 1
+    assert ledger["重复投递"] == 1
+    assert ledger["累计计提（分）"] == overview["provision"]["totals"]["本期计提（分）"]
+    assert sum(ledger["逐户累计（分）"].values()) == ledger["累计计提（分）"]
 
 
 def test_scenario_result_and_stage_use_same_snapshot():
